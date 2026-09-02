@@ -439,8 +439,9 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_snapshot(uni_sysinfo_cpu_snapshot_
             topology->core_type = UNI_SYSINFO_CPU_CORE_TYPE_EFFICIENCY;
           }
         }
-        if (vendor == UNI_SYSINFO_CPU_VENDOR_AMD && core->allowed) {
-          int restoration_failed;
+        if (process_architecture == UNI_SYSINFO_CPU_ARCHITECTURE_X86 &&
+            (((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) == 0) || core->allowed)) {
+          int restoration_failed = 0;
           uni_sysinfo_cpu_core_type_e cpuid_type = uni_sysinfo_windows_cpuid_core_type(core, &restoration_failed);
           if (restoration_failed) {
             free(next_physical_core);
@@ -595,9 +596,8 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_apply(const uni_sysinfo_c
   if (core == NULL || previous == NULL)
     return UNI_SYSINFO_RESULT_INVALID_ARGUMENT;
   *previous = NULL;
-  if (GetActiveProcessorGroupCount() != 1)
-    return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
-  if (!core->allowed || core->os_cpu_id >= sizeof(KAFFINITY) * 8)
+  if (((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) != 0 && !core->allowed) ||
+      core->os_cpu_id >= sizeof(KAFFINITY) * 8)
     return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
   state = (uni_sysinfo_cpu_affinity_t *)malloc(sizeof(*state));
   if (state == NULL)

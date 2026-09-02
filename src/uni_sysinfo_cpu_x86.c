@@ -227,9 +227,20 @@ uni_sysinfo_cpu_core_type_e uni_sysinfo_cpu_x86_current_core_type(void) {
   memcpy(vendor_name + 4, &registers[3], 4);
   memcpy(vendor_name + 8, &registers[2], 4);
   vendor_name[12] = '\0';
-  if (strcmp(vendor_name, "AuthenticAMD") != 0) {
+
+  if (strcmp(vendor_name, "GenuineIntel") == 0) {
+    uni_sysinfo_cpuid(0, 0, registers);
+    if (registers[0] < 0x1au)
+      return UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
+    uni_sysinfo_cpuid(0x1au, 0, registers);
+    if (((registers[0] >> 24) & 0xffu) == 0x40u)
+      return UNI_SYSINFO_CPU_CORE_TYPE_PERFORMANCE;
+    if (((registers[0] >> 24) & 0xffu) == 0x20u)
+      return UNI_SYSINFO_CPU_CORE_TYPE_EFFICIENCY;
     return UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
   }
+  if (strcmp(vendor_name, "AuthenticAMD") != 0)
+    return UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
 
   uni_sysinfo_cpuid(0x80000000u, 0, registers);
   if (registers[0] < 0x80000026u) {
@@ -279,7 +290,7 @@ uni_sysinfo_result_e uni_sysinfo_cpu_x86_info(const uni_sysinfo_cpu_snapshot_t *
     return status;
   if (core->architecture != UNI_SYSINFO_CPU_ARCHITECTURE_X86)
     return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
-  if (!core->allowed)
+  if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) != 0 && !core->allowed)
     return UNI_SYSINFO_RESULT_OK;
 
   if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_NATIVE_ID) != 0) {
@@ -328,11 +339,7 @@ uni_sysinfo_result_e uni_sysinfo_cpu_x86_features_common(const uni_sysinfo_cpu_s
       break;
     if (core->architecture != UNI_SYSINFO_CPU_ARCHITECTURE_X86)
       continue;
-    if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) == 0) {
-      status = UNI_SYSINFO_RESULT_NOT_SUPPORTED;
-      break;
-    }
-    if (!core->allowed)
+    if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) != 0 && !core->allowed)
       continue;
     status = uni_sysinfo_cpu_x86_info(snapshot, logical_index, &info);
     if (status != UNI_SYSINFO_RESULT_OK)

@@ -578,8 +578,8 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_snapshot(uni_sysinfo_cpu_snapshot_
         core->valid_fields |= UNI_SYSINFO_CPU_VALID_PERFORMANCE_CLASS;
     }
     if (core->topology.core_type == UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN &&
-        architecture == UNI_SYSINFO_CPU_ARCHITECTURE_X86 && vendor == UNI_SYSINFO_CPU_VENDOR_AMD) {
-      int restoration_failed;
+        architecture == UNI_SYSINFO_CPU_ARCHITECTURE_X86) {
+      int restoration_failed = 0;
       core->topology.core_type = uni_sysinfo_linux_cpuid_core_type(cpus[index].os_cpu_id, &restoration_failed);
       if (restoration_failed) {
         free(package_ids);

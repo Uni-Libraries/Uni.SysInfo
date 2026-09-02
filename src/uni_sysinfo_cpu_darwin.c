@@ -244,6 +244,7 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_snapshot(uni_sysinfo_cpu_snapshot_
                                      &level_cache, output_index);
         core->topology.hw_core_idx = physical_offset + local_index % (size_t)level_physical;
         core->topology.smt_idx     = local_index / (size_t)level_physical;
+        core->valid_fields |= UNI_SYSINFO_CPU_VALID_TOPOLOGY;
         if (performance_levels_valid) {
           core->topology.core_type = uni_sysinfo_darwin_core_type(level_name, level, (size_t)performance_level_count);
           core->valid_fields |= UNI_SYSINFO_CPU_VALID_CORE_TYPE;
@@ -259,6 +260,7 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_snapshot(uni_sysinfo_cpu_snapshot_
                                    output_index);
       core->topology.hw_core_idx = output_index;
       core->topology.core_type   = UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
+      core->valid_fields |= UNI_SYSINFO_CPU_VALID_TOPOLOGY;
       uni_sysinfo_darwin_set_max_frequency(core, max_frequency, max_frequency_valid);
       ++output_index;
     }
@@ -299,6 +301,7 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_snapshot(uni_sysinfo_cpu_snapshot_
       core->topology.hw_core_idx = core_index % (size_t)physical_per_package;
       core->topology.smt_idx     = core_index / (size_t)physical_per_package;
       core->topology.core_type   = UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
+      core->valid_fields |= UNI_SYSINFO_CPU_VALID_TOPOLOGY;
       uni_sysinfo_darwin_set_max_frequency(core, max_frequency, max_frequency_valid);
     }
   }
@@ -355,11 +358,43 @@ static uni_sysinfo_result_e uni_sysinfo_darwin_mach_policy_result(kern_return_t 
 
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_apply(const uni_sysinfo_cpu_core_info_t *core,
                                                              uni_sysinfo_cpu_affinity_t **previous) {
+  uni_sysinfo_cpu_affinity_t *state;
+  thread_affinity_policy_data_t current;
+  thread_affinity_policy_data_t target;
+  mach_msg_type_number_t count = THREAD_AFFINITY_POLICY_COUNT;
+  boolean_t get_default        = 0;
+  kern_return_t status;
+
   if (core == NULL || previous == NULL)
     return UNI_SYSINFO_RESULT_INVALID_ARGUMENT;
   *previous = NULL;
-  /* THREAD_AFFINITY_POLICY cannot bind this thread to the selected CPU. */
-  return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
+  if (core->host_architecture == UNI_SYSINFO_CPU_ARCHITECTURE_AARCH64 || core->os_cpu_id >= (size_t)INT_MAX)
+    return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
+
+  state = (uni_sysinfo_cpu_affinity_t *)calloc(1, sizeof(*state));
+  if (state == NULL)
+    return UNI_SYSINFO_RESULT_SYSTEM_ERROR;
+  state->thread = mach_thread_self();
+  if (state->thread == MACH_PORT_NULL) {
+    free(state);
+    return UNI_SYSINFO_RESULT_SYSTEM_ERROR;
+  }
+
+  status = thread_policy_get(state->thread, THREAD_AFFINITY_POLICY, (thread_policy_t)&current, &count, &get_default);
+  if (status != KERN_SUCCESS) {
+    uni_sysinfo_cpu_platform_affinity_destroy(state);
+    return uni_sysinfo_darwin_mach_policy_result(status);
+  }
+  state->policy.affinity_tag = get_default ? THREAD_AFFINITY_TAG_NULL : current.affinity_tag;
+  target.affinity_tag        = (integer_t)core->os_cpu_id + 1;
+  status = thread_policy_set(state->thread, THREAD_AFFINITY_POLICY, (thread_policy_t)&target,
+                             THREAD_AFFINITY_POLICY_COUNT);
+  if (status != KERN_SUCCESS) {
+    uni_sysinfo_cpu_platform_affinity_destroy(state);
+    return uni_sysinfo_darwin_mach_policy_result(status);
+  }
+  *previous = state;
+  return UNI_SYSINFO_RESULT_OK;
 }
 
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_restore(uni_sysinfo_cpu_affinity_t *previous) {

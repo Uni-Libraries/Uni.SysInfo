@@ -226,7 +226,7 @@ uni_sysinfo_result_e uni_sysinfo_cpu_affinity_apply(const uni_sysinfo_cpu_snapsh
   status    = uni_sysinfo_cpu_snapshot_get_core(snapshot, logical_index, NULL, NULL, &core);
   if (status != UNI_SYSINFO_RESULT_OK)
     return status;
-  if (!core->allowed)
+  if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) != 0 && !core->allowed)
     return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
   return uni_sysinfo_cpu_platform_affinity_apply(core, previous);
 }

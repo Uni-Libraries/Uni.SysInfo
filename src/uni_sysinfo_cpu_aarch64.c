@@ -36,10 +36,9 @@ uni_sysinfo_result_e uni_sysinfo_cpu_aarch64_features_common(const uni_sysinfo_c
       return status;
     if (core->architecture != UNI_SYSINFO_CPU_ARCHITECTURE_AARCH64)
       continue;
-    if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) == 0)
-      return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
-    if (core->allowed)
-      found = 1;
+    if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) != 0 && !core->allowed)
+      continue;
+    found = 1;
   }
   if (!found)
     return UNI_SYSINFO_RESULT_NOT_SUPPORTED;

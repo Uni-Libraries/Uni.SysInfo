@@ -42,7 +42,7 @@ int main(void) {
             previous.os_cpu_id != processor.os_cpu_id);
     }
 
-    if (processor.allowed) {
+    if ((processor.valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) == 0 || processor.allowed) {
       uni_sysinfo_cpu_affinity_t *affinity = NULL;
       uni_sysinfo_result_e affinity_status;
       ++allowed_count;
