@@ -29,6 +29,15 @@ typedef struct {
 
 typedef LONG(WINAPI *uni_sysinfo_windows_call_nt_power_information_t)(int, PVOID, ULONG, PVOID, ULONG);
 
+#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
+typedef struct {
+  const uni_sysinfo_cpu_core_info_t *core;
+  uni_sysinfo_cpu_x86_info_t *info;
+  uni_sysinfo_cpu_core_type_e *core_type;
+  uni_sysinfo_result_e status;
+} uni_sysinfo_windows_x86_query_t;
+#endif
+
 static int uni_sysinfo_windows_valid_record(const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *entry, size_t remaining,
                                             LOGICAL_PROCESSOR_RELATIONSHIP relationship) {
   const size_t header_size = offsetof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, Processor);
@@ -197,26 +206,61 @@ static void uni_sysinfo_windows_apply_max_frequency(uni_sysinfo_cpu_snapshot_t *
   FreeLibrary(module);
 }
 
-static uni_sysinfo_cpu_core_type_e uni_sysinfo_windows_cpuid_core_type(const uni_sysinfo_cpu_core_info_t *core,
-                                                                       int *restoration_failed) {
 #if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
-  uni_sysinfo_cpu_affinity_t *affinity = NULL;
-  uni_sysinfo_cpu_core_type_e result;
+static DWORD WINAPI uni_sysinfo_windows_x86_query_thread(LPVOID argument) {
+  uni_sysinfo_windows_x86_query_t *query = (uni_sysinfo_windows_x86_query_t *)argument;
+  GROUP_AFFINITY target                  = {0};
 
-  *restoration_failed = 0;
-  if (uni_sysinfo_cpu_platform_affinity_apply(core, &affinity) != UNI_SYSINFO_RESULT_OK)
-    return UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
-  result = uni_sysinfo_cpu_x86_current_core_type();
-  if (uni_sysinfo_cpu_platform_affinity_restore(affinity) != UNI_SYSINFO_RESULT_OK) {
-    result              = UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
-    *restoration_failed = 1;
+  target.Group = query->core->os_group;
+  target.Mask  = (KAFFINITY)1 << query->core->os_cpu_id;
+  if (!SetThreadGroupAffinity(GetCurrentThread(), &target, NULL)) {
+    DWORD error   = GetLastError();
+    query->status = error == ERROR_INVALID_PARAMETER || error == ERROR_ACCESS_DENIED || error == ERROR_NOT_SUPPORTED
+                        ? UNI_SYSINFO_RESULT_NOT_SUPPORTED
+                        : UNI_SYSINFO_RESULT_SYSTEM_ERROR;
+    return 0;
   }
-  uni_sysinfo_cpu_platform_affinity_destroy(affinity);
-  return result;
+
+  if (query->info != NULL) {
+    uni_sysinfo_cpu_x86_detect(NULL, 0, NULL, &query->info->features);
+    query->info->valid_fields |= UNI_SYSINFO_CPU_X86_VALID_FEATURES;
+    if (uni_sysinfo_cpu_x86_identity(&query->info->family, &query->info->model, &query->info->stepping))
+      query->info->valid_fields |= UNI_SYSINFO_CPU_X86_VALID_IDENTITY;
+  }
+  if (query->core_type != NULL)
+    *query->core_type = uni_sysinfo_cpu_x86_current_core_type();
+  query->status = UNI_SYSINFO_RESULT_OK;
+  return 0;
+}
+#endif
+
+uni_sysinfo_result_e uni_sysinfo_cpu_windows_query_x86(const uni_sysinfo_cpu_core_info_t *core,
+                                                       uni_sysinfo_cpu_x86_info_t *info,
+                                                       uni_sysinfo_cpu_core_type_e *core_type) {
+#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
+  uni_sysinfo_windows_x86_query_t query;
+  HANDLE thread;
+  DWORD wait_status;
+
+  if (core == NULL || (info == NULL && core_type == NULL) || core->os_cpu_id >= sizeof(KAFFINITY) * 8)
+    return UNI_SYSINFO_RESULT_INVALID_ARGUMENT;
+  query.core      = core;
+  query.info      = info;
+  query.core_type = core_type;
+  query.status    = UNI_SYSINFO_RESULT_UNKNOWN;
+  thread          = CreateThread(NULL, 0, uni_sysinfo_windows_x86_query_thread, &query, 0, NULL);
+  if (thread == NULL)
+    return UNI_SYSINFO_RESULT_SYSTEM_ERROR;
+  wait_status = WaitForSingleObject(thread, INFINITE);
+  if (wait_status != WAIT_OBJECT_0)
+    (void)WaitForSingleObject(thread, INFINITE);
+  CloseHandle(thread);
+  return wait_status == WAIT_OBJECT_0 ? query.status : UNI_SYSINFO_RESULT_SYSTEM_ERROR;
 #else
   (void)core;
-  *restoration_failed = 0;
-  return UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
+  (void)info;
+  (void)core_type;
+  return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
 #endif
 }
 
@@ -441,9 +485,9 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_snapshot(uni_sysinfo_cpu_snapshot_
         }
         if (process_architecture == UNI_SYSINFO_CPU_ARCHITECTURE_X86 &&
             (((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) == 0) || core->allowed)) {
-          int restoration_failed = 0;
-          uni_sysinfo_cpu_core_type_e cpuid_type = uni_sysinfo_windows_cpuid_core_type(core, &restoration_failed);
-          if (restoration_failed) {
+          uni_sysinfo_cpu_core_type_e cpuid_type = UNI_SYSINFO_CPU_CORE_TYPE_UNKNOWN;
+          uni_sysinfo_result_e cpuid_status      = uni_sysinfo_cpu_windows_query_x86(core, NULL, &cpuid_type);
+          if (cpuid_status == UNI_SYSINFO_RESULT_SYSTEM_ERROR) {
             free(next_physical_core);
             free(core_buffer);
             free(locations);
@@ -596,6 +640,8 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_apply(const uni_sysinfo_c
   if (core == NULL || previous == NULL)
     return UNI_SYSINFO_RESULT_INVALID_ARGUMENT;
   *previous = NULL;
+  if (GetActiveProcessorGroupCount() != 1)
+    return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
   if (((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) != 0 && !core->allowed) ||
       core->os_cpu_id >= sizeof(KAFFINITY) * 8)
     return UNI_SYSINFO_RESULT_NOT_SUPPORTED;

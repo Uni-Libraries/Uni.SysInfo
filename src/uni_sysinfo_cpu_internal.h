@@ -51,6 +51,12 @@ int uni_sysinfo_cpu_x86_identity(unsigned int *family, unsigned int *model, unsi
 
 uni_sysinfo_cpu_core_type_e uni_sysinfo_cpu_x86_current_core_type(void);
 
+#if defined(_WIN32)
+uni_sysinfo_result_e uni_sysinfo_cpu_windows_query_x86(const uni_sysinfo_cpu_core_info_t *core,
+                                                       uni_sysinfo_cpu_x86_info_t *info,
+                                                       uni_sysinfo_cpu_core_type_e *core_type);
+#endif
+
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_aarch64_features(uni_sysinfo_cpu_aarch64_features_t *result);
 
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_apply(const uni_sysinfo_cpu_core_info_t *core,

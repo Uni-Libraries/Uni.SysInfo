@@ -279,7 +279,6 @@ uni_sysinfo_cpu_core_type_e uni_sysinfo_cpu_x86_current_core_type(void) {
 uni_sysinfo_result_e uni_sysinfo_cpu_x86_info(const uni_sysinfo_cpu_snapshot_t *snapshot, size_t logical_index,
                                               uni_sysinfo_cpu_x86_info_t *result) {
   const uni_sysinfo_cpu_core_info_t *core;
-  uni_sysinfo_cpu_affinity_t *affinity = NULL;
   uni_sysinfo_result_e status;
 
   if (result == NULL)
@@ -293,6 +292,10 @@ uni_sysinfo_result_e uni_sysinfo_cpu_x86_info(const uni_sysinfo_cpu_snapshot_t *
   if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_ALLOWED_SET) != 0 && !core->allowed)
     return UNI_SYSINFO_RESULT_OK;
 
+#if defined(_WIN32)
+  return uni_sysinfo_cpu_windows_query_x86(core, result, NULL);
+#else
+  uni_sysinfo_cpu_affinity_t *affinity = NULL;
   if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_NATIVE_ID) != 0) {
     status = uni_sysinfo_cpu_platform_affinity_apply(core, &affinity);
     if (status == UNI_SYSINFO_RESULT_NOT_SUPPORTED)
@@ -315,6 +318,7 @@ uni_sysinfo_result_e uni_sysinfo_cpu_x86_info(const uni_sysinfo_cpu_snapshot_t *
     }
   }
   return UNI_SYSINFO_RESULT_OK;
+#endif
 }
 
 uni_sysinfo_result_e uni_sysinfo_cpu_x86_features_common(const uni_sysinfo_cpu_snapshot_t *snapshot,
