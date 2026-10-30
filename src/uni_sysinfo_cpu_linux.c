@@ -681,6 +681,21 @@ uni_sysinfo_result_e uni_sysinfo_cpu_platform_aarch64_features(uni_sysinfo_cpu_a
 #endif
 }
 
+uni_sysinfo_result_e uni_sysinfo_cpu_platform_current_frequency(const uni_sysinfo_cpu_core_info_t *core,
+                                                                uint64_t *result_hz) {
+  char path[128];
+  long khz = 0;
+
+  *result_hz = 0;
+  if ((core->valid_fields & UNI_SYSINFO_CPU_VALID_NATIVE_ID) == 0)
+    return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
+  snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%zu/cpufreq/scaling_cur_freq", core->os_cpu_id);
+  if (!uni_sysinfo_linux_read_long(path, &khz) || khz <= 0)
+    return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
+  *result_hz = (uint64_t)khz * UINT64_C(1000);
+  return UNI_SYSINFO_RESULT_OK;
+}
+
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_apply(const uni_sysinfo_cpu_core_info_t *core,
                                                              uni_sysinfo_cpu_affinity_t **previous) {
   cpu_set_t *target;

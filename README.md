@@ -12,6 +12,9 @@ fields through `valid_fields`. Generic topology is declared by
 `uni_sysinfo_cpu_aarch64.h` explicitly and query architecture-specific data
 from the same snapshot only after checking a processor's architecture.
 
+`uni_sysinfo_cpu_current_frequency()` reads a processor's current clock from the
+operating system (Linux with cpufreq); it is a live value, not part of the snapshot.
+
 The `uni-sysinfo` CLI prints every available CPU field as a
 `package -> die -> core -> thread` tree.
 

@@ -59,6 +59,9 @@ uni_sysinfo_result_e uni_sysinfo_cpu_windows_query_x86(const uni_sysinfo_cpu_cor
 
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_aarch64_features(uni_sysinfo_cpu_aarch64_features_t *result);
 
+uni_sysinfo_result_e uni_sysinfo_cpu_platform_current_frequency(const uni_sysinfo_cpu_core_info_t *core,
+                                                                uint64_t *result_hz);
+
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_apply(const uni_sysinfo_cpu_core_info_t *core,
                                                              uni_sysinfo_cpu_affinity_t **previous);
 

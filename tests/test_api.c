@@ -93,6 +93,17 @@ int main(void) {
     CHECK(uni_sysinfo_cpu_x86_info(snapshot, 0, &x86_info) == UNI_SYSINFO_RESULT_NOT_SUPPORTED);
   }
 
+  {
+    uint64_t frequency_hz = 1;
+    uni_sysinfo_result_e frequency_status;
+    CHECK(uni_sysinfo_cpu_current_frequency(snapshot, 0, NULL) == UNI_SYSINFO_RESULT_INVALID_ARGUMENT);
+    CHECK(uni_sysinfo_cpu_current_frequency(snapshot, logical_count, &frequency_hz) == UNI_SYSINFO_RESULT_OUT_OF_RANGE);
+    CHECK(frequency_hz == 0);
+    frequency_status = uni_sysinfo_cpu_current_frequency(snapshot, 0, &frequency_hz);
+    CHECK(frequency_status == UNI_SYSINFO_RESULT_OK || frequency_status == UNI_SYSINFO_RESULT_NOT_SUPPORTED);
+    CHECK((frequency_status == UNI_SYSINFO_RESULT_OK) == (frequency_hz != 0));
+  }
+
   uni_sysinfo_cpu_snapshot_destroy(snapshot);
   return 0;
 }

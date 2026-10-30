@@ -215,6 +215,20 @@ uni_sysinfo_result_e uni_sysinfo_cpu_snapshot_logical_processor(const uni_sysinf
   return UNI_SYSINFO_RESULT_OK;
 }
 
+uni_sysinfo_result_e uni_sysinfo_cpu_current_frequency(const uni_sysinfo_cpu_snapshot_t *snapshot, size_t logical_index,
+                                                       uint64_t *result_hz) {
+  const uni_sysinfo_cpu_core_info_t *core;
+  uni_sysinfo_result_e status;
+
+  if (result_hz == NULL)
+    return UNI_SYSINFO_RESULT_INVALID_ARGUMENT;
+  *result_hz = 0;
+  status     = uni_sysinfo_cpu_snapshot_get_core(snapshot, logical_index, NULL, NULL, &core);
+  if (status != UNI_SYSINFO_RESULT_OK)
+    return status;
+  return uni_sysinfo_cpu_platform_current_frequency(core, result_hz);
+}
+
 uni_sysinfo_result_e uni_sysinfo_cpu_affinity_apply(const uni_sysinfo_cpu_snapshot_t *snapshot, size_t logical_index,
                                                     uni_sysinfo_cpu_affinity_t **previous) {
   const uni_sysinfo_cpu_core_info_t *core;

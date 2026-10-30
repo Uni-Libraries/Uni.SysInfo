@@ -259,6 +259,22 @@ UNI_SYSINFO_EXPORT uni_sysinfo_result_e uni_sysinfo_cpu_snapshot_logical_process
     const uni_sysinfo_cpu_snapshot_t *snapshot, size_t logical_index, uni_sysinfo_cpu_logical_processor_t *result);
 
 /**
+ * @brief Reads the current clock of one snapshot logical processor.
+ *
+ * Unlike the snapshot fields this is a live reading from the operating system's
+ * frequency driver, so it can change between calls. Only Linux with cpufreq
+ * reports it; a core that has no usable driver returns NOT_SUPPORTED.
+ *
+ * @param[in] snapshot CPU topology snapshot.
+ * @param[in] logical_index Zero-based logical-processor index in the snapshot.
+ * @param[out] result_hz Receives the frequency in hertz on success, otherwise zero.
+ * @return UNI_SYSINFO_RESULT_OK on success, OUT_OF_RANGE for an invalid index,
+ *         NOT_SUPPORTED when no reading is available, or another error code.
+ */
+UNI_SYSINFO_EXPORT uni_sysinfo_result_e uni_sysinfo_cpu_current_frequency(const uni_sysinfo_cpu_snapshot_t *snapshot,
+                                                                          size_t logical_index, uint64_t *result_hz);
+
+/**
  * @brief Pins the calling thread to one snapshot logical processor.
  *
  * The previous affinity state is captured for restoration. Restore it on the

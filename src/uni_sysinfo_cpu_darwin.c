@@ -356,6 +356,13 @@ static uni_sysinfo_result_e uni_sysinfo_darwin_mach_policy_result(kern_return_t 
   return UNI_SYSINFO_RESULT_SYSTEM_ERROR;
 }
 
+uni_sysinfo_result_e uni_sysinfo_cpu_platform_current_frequency(const uni_sysinfo_cpu_core_info_t *core,
+                                                                uint64_t *result_hz) {
+  (void)core;
+  *result_hz = 0;
+  return UNI_SYSINFO_RESULT_NOT_SUPPORTED;
+}
+
 uni_sysinfo_result_e uni_sysinfo_cpu_platform_affinity_apply(const uni_sysinfo_cpu_core_info_t *core,
                                                              uni_sysinfo_cpu_affinity_t **previous) {
   uni_sysinfo_cpu_affinity_t *state;
