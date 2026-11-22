@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 26.04 (GCC)
+            runner: ubuntu-26.04
+            compiler: gcc
+          - name: Ubuntu 26.04 (Clang)
+            runner: ubuntu-26.04
+            compiler: clang
+          - name: Windows Server 2025 (MSVC)
+            runner: windows-2025
+          - name: macOS 26 (Intel)
+            runner: macos-26-intel
+            compiler: /usr/bin/clang
+          - name: macOS 26 (ARM64)
+            runner: macos-26
+            compiler: /usr/bin/clang
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Configure (Linux and macOS)
+        if: runner.os != 'Windows'
+        env:
+          CC: ${{ matrix.compiler }}
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON -DUNI_SYSINFO_BUILD_CLI=ON
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: >-
+          cmake -S . -B build -G "Visual Studio 18 2026" -A x64
+          -DBUILD_TESTING=ON -DUNI_SYSINFO_BUILD_CLI=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure --no-tests=error
